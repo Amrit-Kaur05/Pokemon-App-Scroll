@@ -20,10 +20,18 @@ import okhttp3.Headers
 import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
+    // making lists to use in app
     private lateinit var pokeImgList: MutableList<String>
     private lateinit var pokeTitleList: MutableList<String>
     private lateinit var pokeDescList: MutableList<String>
     private lateinit var rvPoke: RecyclerView
+    private lateinit var adapter: PokeAdapter
+
+    // making a layoutManager for scrolling
+    private lateinit var layoutManager: LinearLayoutManager
+
+    // keeping track of whether the API call has completed
+    private var isLoading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,15 +47,30 @@ class MainActivity : AppCompatActivity() {
         pokeImgList = mutableListOf()
         pokeTitleList = mutableListOf()
         pokeDescList = mutableListOf()
+
+        // using adapter and lists
+        adapter = PokeAdapter(pokeImgList, pokeTitleList, pokeDescList)
+        rvPoke.adapter = adapter
+        layoutManager = LinearLayoutManager(this@MainActivity)
+        rvPoke.layoutManager = LinearLayoutManager(this@MainActivity)
+
         updatePokemon()
 
     }
 
     private fun updatePokemon() {
+        // if the api call is not complete, skip the rest of the code
+        if (isLoading) {
+            return
+        }
+        // making isLoading true to show that the api call has started
+        isLoading = true
 
         val client = AsyncHttpClient()
+        var fetchedPokemonCount = 0
+        val lock = Any()
 
-        for (i in 0 until 20) {
+        for (i in 0 until 10) {
             // getting a random number to use as an id
             val randomID = Random.nextInt(1, 1026).toString()
             Log.d("randomID", randomID)
@@ -70,17 +93,29 @@ class MainActivity : AppCompatActivity() {
                     // updating pokemon abilities and adding to list
                     var amountAbilities = json.jsonObject.getJSONArray("abilities").length()
                     var allAbilities = "Abilities: \n"
-                    for (i in 0 until amountAbilities) {
-                        Log.d("i", "pokemon count: $i")
+                    for (j in 0 until amountAbilities) {
+                        Log.d("j", "pokemon count: $j")
                         allAbilities =
                             allAbilities + "\n" + json.jsonObject.getJSONArray("abilities")
-                                .getJSONObject(i).getJSONObject("ability").getString("name")
+                                .getJSONObject(j).getJSONObject("ability").getString("name")
                                 .replaceFirstChar { it.titlecase() }
 
                     }
                     pokeDescList.add(allAbilities)
 
 
+
+
+                    // updating the adapter with the new loaded lists
+                    runOnUiThread {
+                        synchronized(lock) {
+                            fetchedPokemonCount++
+                            if (fetchedPokemonCount == 10) {
+                                adapter.notifyDataSetChanged()
+                                isLoading = false
+                            }
+                        }
+                    }
 
                 }
 
@@ -95,9 +130,5 @@ class MainActivity : AppCompatActivity() {
             }]
         }
 
-        // using adapter and lists
-        val adapter = PokeAdapter(pokeImgList, pokeTitleList, pokeDescList)
-        rvPoke.adapter = adapter
-        rvPoke.layoutManager = LinearLayoutManager(this@MainActivity)
     }
 }
