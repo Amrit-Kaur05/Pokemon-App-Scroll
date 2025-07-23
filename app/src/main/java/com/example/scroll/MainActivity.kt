@@ -10,6 +10,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.codepath.asynchttpclient.AsyncHttpClient
 import com.codepath.asynchttpclient.callback.JsonHttpResponseHandler
@@ -18,7 +20,10 @@ import okhttp3.Headers
 import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var pokemonBall: ImageView
+    private lateinit var pokeImgList: MutableList<String>
+    private lateinit var pokeTitleList: MutableList<String>
+    private lateinit var pokeDescList: MutableList<String>
+    private lateinit var rvPoke: RecyclerView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,15 +35,11 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        pokemonBall = findViewById(R.id.pokeImg)
-        pokemonBall.setImageDrawable(AppCompatResources.getDrawable(this, R.drawable.pokeball))
-
-        // making a button to update the pokemon image
-        var generateButton = findViewById<Button>(R.id.generate)
-
-        generateButton.setOnClickListener {
-            updatePokemon()
-        }
+        rvPoke = findViewById<RecyclerView>(R.id.pokemon_list)
+        pokeImgList = mutableListOf()
+        pokeTitleList = mutableListOf()
+        pokeDescList = mutableListOf()
+        updatePokemon()
 
     }
 
@@ -46,57 +47,57 @@ class MainActivity : AppCompatActivity() {
 
         val client = AsyncHttpClient()
 
-        // getting a random number to use as an id
-        val randomID = Random.nextInt(1, 1026).toString()
-        Log.d("randomID", randomID)
+        for (i in 0 until 20) {
+            // getting a random number to use as an id
+            val randomID = Random.nextInt(1, 1026).toString()
+            Log.d("randomID", randomID)
 
-        client[("https://pokeapi.co/api/v2/pokemon/"+randomID), object : JsonHttpResponseHandler() {
-            override fun onSuccess(statusCode: Int, headers: Headers, json: JSON) {
-                Log.d("Pokemon", "response successful")
+            client[("https://pokeapi.co/api/v2/pokemon/" + randomID), object :
+                JsonHttpResponseHandler() {
+                override fun onSuccess(statusCode: Int, headers: Headers, json: JSON) {
+                    Log.d("Pokemon", "response successful")
 
-                // updating pokemon image
-//                val pokemonImgURL = json.jsonObject.get("sprites").getString("default-front")
-                val pokemonImgURL = json.jsonObject.getJSONObject("sprites").getString("front_default")
+                    // getting pokemon image and adding to list
+                    val pokemonImgURL =
+                        json.jsonObject.getJSONObject("sprites").getString("front_default")
+                    pokeImgList.add(pokemonImgURL)
 
-//                val pokemonImgURL = json.jsonObject.getString("front_default")
-//                val spriteUrl = json.jsonObject.sprites.front_default // Get the default front sprite
-                Log.d("pokemonImgURL", "pokemon image URL set: $pokemonImgURL")
-                val pokemonImageOutput = findViewById<ImageView>(R.id.pokeImg)
-                Glide.with(this@MainActivity)
-                    .load(pokemonImgURL)
-                    .fitCenter()
-                    .into(pokemonImageOutput)
+                    // getting pokemon name and adding to list
+                    val pokemonName =
+                        json.jsonObject.getString("name").replaceFirstChar { it.titlecase() }
+                    pokeTitleList.add(pokemonName)
 
-                // updating pokemon name
-                val pokemonName = json.jsonObject.getString("name").replaceFirstChar { it.titlecase() }
-                Log.d("pokemonName", "pokemon name set: $pokemonName")
-                val pokemonNameOutput = findViewById<TextView>(R.id.name)
-                pokemonNameOutput.text = pokemonName
+                    // updating pokemon abilities and adding to list
+                    var amountAbilities = json.jsonObject.getJSONArray("abilities").length()
+                    var allAbilities = "Abilities: \n"
+                    for (i in 0 until amountAbilities) {
+                        Log.d("i", "pokemon count: $i")
+                        allAbilities =
+                            allAbilities + "\n" + json.jsonObject.getJSONArray("abilities")
+                                .getJSONObject(i).getJSONObject("ability").getString("name")
+                                .replaceFirstChar { it.titlecase() }
 
-                // updating pokemon abilities
-                var amountAbilities = json.jsonObject.getJSONArray("abilities").length()
-                Log.d("pokemonAbilitiesCount", "pokemon ability count: $amountAbilities")
-                val pokemonAbilityOutput = findViewById<TextView>(R.id.abilities)
-                pokemonAbilityOutput.text = ""
-                var allAbilities = "Abilities: \n"
+                    }
+                    pokeDescList.add(allAbilities)
 
-                for (i in 0 until amountAbilities){
-                    Log.d("i", "pokemon count: $i")
-                    allAbilities = allAbilities + "\n" + pokemonAbilityOutput.getText().toString() + json.jsonObject.getJSONArray("abilities").getJSONObject(i).getJSONObject("ability").getString("name").replaceFirstChar { it.titlecase() }
+
 
                 }
 
-                pokemonAbilityOutput.text = allAbilities
-            }
+                override fun onFailure(
+                    statusCode: Int,
+                    headers: Headers?,
+                    errorResponse: String,
+                    throwable: Throwable?
+                ) {
+                    Log.d("Pokemon Error", errorResponse)
+                }
+            }]
+        }
 
-            override fun onFailure(
-                statusCode: Int,
-                headers: Headers?,
-                errorResponse: String,
-                throwable: Throwable?
-            ) {
-                Log.d("Pokemon Error", errorResponse)
-            }
-        }]
+        // using adapter and lists
+        val adapter = PokeAdapter(pokeImgList, pokeTitleList, pokeDescList)
+        rvPoke.adapter = adapter
+        rvPoke.layoutManager = LinearLayoutManager(this@MainActivity)
     }
 }
